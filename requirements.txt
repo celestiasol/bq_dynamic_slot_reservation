@@ -1,0 +1,4 @@
+google-cloud-bigquery-reservation==1.17.1
+google-cloud-bigquery==3.30.0
+google-auth
+pendulum==3.0.0

@@ -1,0 +1,47 @@
+{
+  "metadata": {
+    "project_id": "your-gcp-project",
+    "reservation_id": "your-reservation-id",
+    "location": "asia-southeast2"
+  },
+  "check_interval_minutes": 5,
+  "reservation_slot_profiles": {
+    "low": { "min": 1500, "max": 2000, "increment": 100 },
+    "medium": { "min": 2500, "max": 3000, "increment": 100 },
+    "high": { "min": 3500, "max": 4000, "increment": 100 }
+  },
+  "reservation_time_mapping": {
+    "0": {   
+      "8": { "0": "high", "30": "high" },
+      "12": { "0": "medium", "30": "medium" },
+      "18": { "0": "low", "30": "low" }
+    },
+    "1": {   
+      "8": { "0": "high", "30": "high" },
+      "12": { "0": "medium", "30": "medium" },
+      "18": { "0": "low", "30": "low" }
+    },
+    "2": {
+         "8": { "0": "high", "30": "high" } 
+    }, 
+    "3": {
+         "8": { "0": "high", "30": "high" } 
+    },
+    "4": { 
+        "8": { "0": "high", "30": "high" } 
+    },
+    "5": {
+         "8": { "0": "medium", "30": "medium" } 
+    },
+    "6": {
+         "8": { "0": "low", "30": "low" } 
+    }
+  },
+  "sql_path": "queries/jobs_sla_metrics.sql",
+  "sla_thresholds": {
+    "count_job_pending_max": 50,
+    "avg_queueing_time_max": 60,
+    "job_error_max": 1
+  },
+  "default_adjustment_slots": 50
+}
