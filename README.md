@@ -99,11 +99,55 @@ sequenceDiagram
     end
 ```
 
+## Design Rationale
+
+The configurations is split into three logical layers to support reusability and operational safety:
+1. Metadata
+2. Slot Profiles
+3. Time-Based Mapping / Schedules
+
+### 1. Metadata (Environment Binidng)
+```
+"metadata": {
+  "project_id": "...",
+  "reservation_id": "...",
+  "location": "asia-southeast2"
+}
+```
+This layer keeps environment-specific details separate from scaling logic. The purpose is to enable reusability of the same logic policy across different projects/regions/reservations. Thus, allowing the pipelines to be promoted between environments (dev to prod) with minimal changes.
+
+### 2. Slot Profiles (Reussable Capacity Policies)
+```
+"reservation_slot_profiles": {
+  "low":    { "min": 1500, "max": 2000, "increment": 100 },
+  "medium": { "min": 2500, "max": 3000, "increment": 100 },
+  "high":   { "min": 3500, "max": 4000, "increment": 100 }
+}
+```
+Slot profiles represent abstract slot capacities, the purpose is to avoid duplicating slot numbers across multiple time windows and to allow easy tuning of capacity behavior without changing logic. If a profile needs adjustment (e.g., increasing peak max slots), it can be done once and applied everywhere. It also makes scaling decision policies explicit, and not just ad-hoc based.
+
+### 3. Time-Based Mapping (Peak Hour Scheduling)
+```
+"reservation_time_mapping": {
+  "0": {
+    "8":  { "0": "high", "30": "high" },
+    "18": { "0": "low",  "30": "low"  }
+  }
+}
+```
+This layer enables predictable baseline capacity during known peak hours. The key principle for this time-based configurations is to define the expected behavior, while SLA signals correct deviations in real-time. The configuration maps weekday → hour → 30-minute window → slot profile, and it uses Python’s `day_of_week` semantics (0 = Monday).
+
+## Near real-time SLA Metric feedback 
+In parallel, the system actively monitors BigQuery workload health by querying `INFORMATION_SCHEMA.JOBS` at a fixed interval (typically 3 or 5 minutes). The controller evaluates SLA health using pending job counts, queueing time percentiles, max running job durations and error job ratios, these metrics are directly tied to user experience, making them ideal inputs for scaling decisions. At each evaluation cycle, the controller collect recent job metrics from the previous window, evaluates SLA health (queueing time, pending jobs, errors, long-running queries), and if needed, adjusts reservation capacity by incrementing the slot by 50 or 100. This way of scaling prevents over-provisioning from short-lived spikes and reduces the risk of cost explosions caused by noisy or transient workloads.
+
+## Window Reset Behavior
+To ensure that long cooldown/buffer periods from BigQuery autoscaling are effectively bypassed, each 30-minute window acts as a natural reset point. When the controller transitions into a new window, slot capacity is re-aligned with the configured baseline for that window and any temporary scale-ups from the previous window do not automatically carry over. The system starts from a clean, policy-defined state and cost returns to expected levels once demand subsides.
+
 ## Considerations & Limitations
 
 ### Randomness of Workloads
 
-Query spikes can happen at unpredictable times (e.g., national holidays, ad-hoc analysis, migrations).
+Query spikes can happen at unpredictable times (e.g., national holidays, ad-hoc analysis, migrations, emergency debugging, etc.).
 This randomness makes purely predictive or ML-based slot forecasting unreliable.
 
 ### Policy-Driven Approach Only
